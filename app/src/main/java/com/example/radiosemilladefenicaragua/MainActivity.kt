@@ -9,6 +9,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+// Importaciones específicas para evitar errores de referencia
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.radiosemilladefenicaragua.ui.theme.RadioSemillaDeFeNicaraguaTheme
@@ -28,27 +34,51 @@ import com.google.common.util.concurrent.MoreExecutors
 class MainActivity : ComponentActivity() {
 
     private var controller: MediaController? = null
+    // Usamos un estado que Compose pueda rastrear correctamente
+    private var isPlayingState = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Conexión con el PlaybackService
         val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
 
         controllerFuture.addListener({
-            controller = controllerFuture.get()
+            try {
+                val connectedController = controllerFuture.get()
+                controller = connectedController
+
+                // Sincronizar el estado inicial
+                isPlayingState.value = connectedController.isPlaying
+
+                connectedController.addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        isPlayingState.value = isPlaying
+                    }
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }, MoreExecutors.directExecutor())
 
         enableEdgeToEdge()
 
         setContent {
             RadioSemillaDeFeNicaraguaTheme {
+                // Observamos el estado reactivo
+                val isPlaying by remember { isPlayingState }
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     RadioControlScreen(
                         modifier = Modifier.padding(innerPadding),
-                        onPlay = { controller?.play() },
-                        onPause = { controller?.pause() }
+                        isPlaying = isPlaying,
+                        onTogglePlay = {
+                            if (isPlaying) controller?.pause() else controller?.play()
+                        },
+                        onStop = {
+                            controller?.stop()
+                            isPlayingState.value = false
+                        }
                     )
                 }
             }
@@ -59,10 +89,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun RadioControlScreen(
     modifier: Modifier = Modifier,
-    onPlay: () -> Unit,
-    onPause: () -> Unit
+    isPlaying: Boolean,
+    onTogglePlay: () -> Unit,
+    onStop: () -> Unit
 ) {
-    // Gradiente de fondo (bg-gradient-to-b)
     val gradientBackground = Brush.verticalGradient(
         colors = listOf(Color(0xFF1A237E), Color(0xFF000000))
     )
@@ -78,7 +108,7 @@ fun RadioControlScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(24.dp)
         ) {
-            // Contenedor del Logo con el archivo WebP
+            // Logo de la Radio
             Box(
                 modifier = Modifier
                     .size(200.dp)
@@ -90,7 +120,7 @@ fun RadioControlScreen(
                     painter = painterResource(id = R.drawable.logo_radio),
                     contentDescription = "Logo de la Radio",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop // Equivalente a object-cover
+                    contentScale = ContentScale.Crop
                 )
             }
 
@@ -111,33 +141,43 @@ fun RadioControlScreen(
 
             Spacer(modifier = Modifier.height(60.dp))
 
-            // Botón de Play Circular
+            // Botón Principal de Reproducción
             Button(
-                onClick = onPlay,
+                onClick = onTogglePlay,
                 modifier = Modifier.size(90.dp),
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
+                    containerColor = if (isPlaying) Color(0xFFE91E63) else Color(0xFF4CAF50)
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
-                Text(
-                    text = "▶",
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                    modifier = Modifier.size(48.dp),
+                    tint = Color.White
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Botón de Detener
-            TextButton(onClick = onPause) {
-                Text(
-                    text = "DETENER TRANSMISIÓN",
-                    color = Color.Red.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.labelLarge
-                )
+            // Botón Secundario de Detener
+            TextButton(onClick = onStop) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "Detener transmisión",
+                        tint = Color.Red.copy(alpha = 0.7f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DETENER TRANSMISIÓN",
+                        color = Color.Red.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
         }
     }
