@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "com.example.radiosemilladefenicaragua"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35 // Ajustado a una versión estable común
 
     defaultConfig {
         applicationId = "com.example.radiosemilladefenicaragua"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -37,6 +33,18 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // --- NUEVA FORMA COMPATIBLE PARA CAMBIAR EL NOMBRE DEL APK ---
+    androidComponents {
+        onVariants { variant ->
+            variant.outputs.forEach { output ->
+                if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                    output.outputFileName.set("RadioSemillaDeFe.apk")
+                }
+            }
+        }
+    }
+    // -----------------------------------------------------------
 }
 
 dependencies {
@@ -48,10 +56,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation("androidx.media3:media3-exoplayer:1.10.0")
-    implementation("androidx.media3:media3-session:1.10.0")
-    implementation("androidx.media3:media3-ui:1.10.0")
+
+    // Media3 y Coil
+    implementation("androidx.media3:media3-exoplayer:1.2.0")
+    implementation("androidx.media3:media3-session:1.2.0")
+    implementation("androidx.media3:media3-ui:1.2.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
